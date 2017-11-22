@@ -98,3 +98,4 @@ config.cfg
 *.ipynb
 *.db-journal
 *.json
+nn/

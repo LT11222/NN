@@ -18,6 +18,8 @@ import random
 
 import sys
 
+import json
+
 def buildDict(data):
     data = [x[:2] for x in data]
     names = [x[0] for x in data]
@@ -73,7 +75,38 @@ def buildMatrixGen(data, nameDict, batch_size = 1):
                 labelOut = []
 
 def genModel(input_dim, optimizer):
+    model = Sequential()
 
+    model.add(Dense(input_dim,input_dim=input_dim))
+    model.add(Activation('relu'))
+
+    model.add(Dropout(0.5))
+
+    model.add(Dense(2048))
+    model.add(Activation('relu'))
+
+    model.add(Dropout(0.5))
+
+    model.add(Dense(512))
+    model.add(Activation('relu'))
+
+    model.add(Dropout(0.5))
+
+    model.add(Dense(128))
+    model.add(Activation('relu'))
+
+    model.add(Dropout(0.5))
+
+    model.add(Dense(nameCount))
+    model.add(Activation('softmax'))
+
+    model.compile(loss='categorical_crossentropy',
+        optimizer = optimizer,
+        metrics=['acc'])
+
+    model.summary()
+
+    return model
             
 if __name__ == "__main__":
 
@@ -89,23 +122,6 @@ if __name__ == "__main__":
     cursor.execute('PRAGMA synchronous = OFF')
     cursor.execute('BEGIN TRANSACTION')
 
-
-    # data = cursor.execute('''
-
-    #     SELECT redName, blueName, winner, 
-    #         red.mu, red.sigma, 
-    #         blue.mu, blue.sigma, 
-    #         (CAST(red.wins AS float)/(red.wins+red.losses)) as redWinrate, 
-    #         (CAST(blue.wins AS float)/(blue.wins+blue.losses)) as blueWinrate, 
-    #         CAST((strftime('%s',red.avgWinTime)-strftime('%s','00:00:00'))-(strftime('%s',red.avgLossTime)-strftime('%s','00:00:00')) as float) as redTime, 
-    #         CAST((strftime('%s',blue.avgWinTime)-strftime('%s','00:00:00'))-(strftime('%s',blue.avgLossTime)-strftime('%s','00:00:00'))as float) as blueTime
-    #         from fights 
-    #         INNER JOIN characters AS red ON fights.redName = red.name and fights.mode = red.mode and fights.mode = "Matchmaking" 
-    #         INNER JOIN characters AS blue ON fights.blueName = blue.name and fights.mode = blue.mode and fights.mode = "Matchmaking" 
-    #         WHERE fights.mode = "Matchmaking" and red.wins+red.losses >= 10 and blue.wins+blue.losses >= 10 and redName != blueName;
-
-    # ''').fetchall()
-
     data = cursor.execute('''
 
         SELECT redName, blueName, winner, 
@@ -118,135 +134,68 @@ if __name__ == "__main__":
 
     ''').fetchall()
 
-    # data = [list(x) for x in data]
-
-    # for count,value in enumerate(data):
-    #     redName, blueName, *_ = value
-
-    #     redStreak = cursor.execute('''
-
-    #         SELECT matchid, redMu+redMuChange as temp from fights where redName = ? and mode = "Matchmaking"
-    #         UNION ALL
-    #         SELECT matchId, blueMu+blueMuChange as temp from fights where blueName = ? and mode = "Matchmaking"
-    #         ORDER BY matchId DESC LIMIT 10;
-
-    #     ''', (redName,redName)).fetchall()
-
-    #     redStreak = [x[1] for x in redStreak[::-1]]
-
-    #     blueStreak = cursor.execute('''
-
-    #         SELECT matchid, redMu+redMuChange as temp from fights where redName = ? and mode = "Matchmaking"
-    #         UNION ALL
-    #         SELECT matchId, blueMu+blueMuChange as temp from fights where blueName = ? and mode = "Matchmaking"
-    #         ORDER BY matchId DESC LIMIT 10;
-
-    #     ''', (blueName,blueName)).fetchall()
-
-    #     blueStreak = [x[1] for x in blueStreak[::-1]]
-
-    #     value.extend(redStreak)
-    #     value.extend(blueStreak)
-
-    #     if count % 10000 == 0:
-    #         print(count/len(data))
-
     conn.close()
 
-    samples = 1000
-    mid = random.randint(1000,len(data)-1000)
+    optDict = {
 
-    data = data[mid-samples:mid+samples]
+        'SGD':[('0.01', SGD(lr=0.01)), ('0.001', SGD(lr=0.001)), ('0.0001', SGD(lr=0.0001))], 
+        'RMSprop':[('0.001', RMSprop(lr=0.001)), ('0.0001', RMSprop(lr=0.0001)), ('0.00001', RMSprop(lr=0.00001))], 
+        'Adagrad':[('0.01', Adagrad(lr=0.01)), ('0.001', Adagrad(lr=0.001)), ('0.0001', Adagrad(lr=0.0001))], 
+        'Adadelta':[('1.0', Adadelta(lr=1.0)), ('0.1', Adadelta(lr=0.1)), ('0.01', Adadelta(lr=0.01))], 
+        'Adam':[('0.001', Adam(lr=0.001)), ('0.0001', Adam(lr=0.0001)), ('0.00001', Adam(lr=0.00001))], 
+        'Adamax':[('0.002', Adamax(lr=0.002)), ('0.0002', Adamax(lr=0.0002)), ('0.00002', Adamax(lr=0.00002))], 
+        'Nadam':[('0.002', Nadam(lr=0.002)), ('0.0002', Nadam(lr=0.0002)), ('0.00002', Nadam(lr=0.00002))]
 
-    nameDict = buildDict(data)
-    nameCount = len(nameDict)
+    }
 
-    # sys.exit()
-    
-    model = Sequential()
-    # model.add(Dense(nameCount+len(data[0])-3,input_dim=nameCount+len(data[0])-3))
-    model.add(Dense(nameCount+len(data[0])-3,input_dim=nameCount+len(data[0])-3))
-    # model.add(Dense(len(data[0])-3,input_dim=len(data[0])-3))
-    model.add(Activation('relu'))
+    resDict = {}
 
-    # model.add(Dropout(0.5))
+    for key, value in optDict.items():
+        resDict[key] = {}
+        
+        for optimizers in optDict[key]:
+            resDict[key][optimizers[0]] = {}
+            resDict[key][optimizers[0]]['train'] = []
+            resDict[key][optimizers[0]]['evaluate'] = []
 
-    model.add(Dense(2048))
-    model.add(Activation('relu'))
+    samples = 10000
+    batch_size = 128
 
-    # model.add(Dropout(0.5))
+    for i in range(5):        
+        mid = random.randint(int(samples/2),len(data)-int(samples/2))
 
-    model.add(Dense(512))
-    model.add(Activation('relu'))
+        dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
 
-    # model.add(Dropout(0.5))
+        nameDict = buildDict(dataTemp)
+        nameCount = len(nameDict)
 
-    model.add(Dense(128))
-    model.add(Activation('relu'))
+        trainData = dataTemp[:int(0.9*len(dataTemp))]
 
-    # model.add(Dropout(0.5))
+        trainEvalData, trainEvalLabels = buildMatrix(dataTemp[int(0.9*0.9*len(dataTemp)):int(0.9*len(dataTemp))], nameDict)
+        trainEvalData = trainEvalData.todense()
+        trainEvalLabels = trainEvalLabels.todense()
 
-    model.add(Dense(nameCount))
-    # model.add(Dense(2))
-    model.add(Activation('softmax'))
+        evalData, evalLabels = buildMatrix(dataTemp[int(0.9*len(dataTemp)):], nameDict)
+        evalData = evalData.todense()
+        evalLabels = evalLabels.todense()
 
-    # SGD, RMSprop, Adagrad, Adadelta, Adam, Adamax, Nadam
+        for name, value in optDict.items():
+            for lr, optimizer in value:
 
-    '''
-    Works with 1000 samples - 
+                model = genModel(nameCount+len(data[0])-3, optimizer)
 
-    Dense(2048)
-    Dense(512)
-    Dense(128)
+                model.fit_generator(buildMatrixGen(trainData, nameDict, batch_size), 
+                    epochs=100, 
+                    steps_per_epoch=len(trainData)/batch_size, 
+                    validation_data=(evalData, evalLabels),
+                    shuffle=True)
 
-    RMSprop(lr=0.0001)
-)
-    Adagrad(lr=0.001)
-    Adagrad(lr=0.0001)
+                scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
 
-    Adadelta(lr=1.0)
-    Adadelta(lr=0.1)
+                scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
 
-    Adam(lr=0.001)
-    Adam(lr=0.0001)
+                resDict[name][lr]['train'].append(scoreTrain[1])
+                resDict[name][lr]['evaluate'].append(scoreEval[1])
 
-    '''
-
-    model.compile(loss='categorical_crossentropy',
-        optimizer = Adam(lr=0.0001),
-        metrics=['acc'])
-
-    # random.shuffle(data)
-
-    model.summary()
-
-    trainData = data[:int(0.9*len(data))]
-    testDataTrain = data[int(0.9*0.9*len(data)):int(0.9*len(data))]
-    testDataEval = data[int(0.9*len(data)):]
-
-    batch_size = 8
-
-    testData, testLabels = buildMatrix(testDataEval, nameDict)
-    testData = testData.todense()
-    testLabels = testLabels.todense()
-
-    model.fit_generator(buildMatrixGen(trainData, nameDict, batch_size), 
-        epochs=100, 
-        steps_per_epoch=len(trainData)/batch_size, 
-        validation_data=(testData,testLabels),
-        shuffle=True)
-        # callbacks=[ModelCheckpoint('data/checkpoint.k', monitor='acc', save_best_only=True, mode='max')])
-
-    testData, testLabels = buildMatrix(testDataTrain, nameDict)
-    testData = testData.todense()
-    testLabels = testLabels.todense()
-
-    score = model.evaluate(testData, testLabels, batch_size=batch_size)
-    print(score)
-
-    testData, testLabels = buildMatrix(testDataEval, nameDict)
-    testData = testData.todense()
-    testLabels = testLabels.todense()
-
-    score = model.evaluate(testData, testLabels, batch_size=batch_size)
-    print(score)
+    with open('results.txt', 'w') as fp:
+        json.dump(resDict, fp, indent=4)
