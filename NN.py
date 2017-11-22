@@ -80,22 +80,22 @@ def genModel(input_dim, optimizer):
     model.add(Dense(input_dim,input_dim=input_dim))
     model.add(Activation('relu'))
 
-    model.add(Dropout(0.5))
+    # model.add(Dropout(0.5))
 
-    model.add(Dense(2048))
-    model.add(Activation('relu'))
+    # model.add(Dense(2048))
+    # model.add(Activation('relu'))
 
-    model.add(Dropout(0.5))
+    # model.add(Dropout(0.5))
 
-    model.add(Dense(512))
-    model.add(Activation('relu'))
+    # model.add(Dense(512))
+    # model.add(Activation('relu'))
 
-    model.add(Dropout(0.5))
+    # model.add(Dropout(0.5))
 
-    model.add(Dense(128))
-    model.add(Activation('relu'))
+    # model.add(Dense(128))
+    # model.add(Activation('relu'))
 
-    model.add(Dropout(0.5))
+    # model.add(Dropout(0.5))
 
     model.add(Dense(nameCount))
     model.add(Activation('softmax'))
@@ -138,13 +138,11 @@ if __name__ == "__main__":
 
     optDict = {
 
-        'SGD':[('0.01', SGD(lr=0.01)), ('0.001', SGD(lr=0.001)), ('0.0001', SGD(lr=0.0001))], 
-        'RMSprop':[('0.001', RMSprop(lr=0.001)), ('0.0001', RMSprop(lr=0.0001)), ('0.00001', RMSprop(lr=0.00001))], 
-        'Adagrad':[('0.01', Adagrad(lr=0.01)), ('0.001', Adagrad(lr=0.001)), ('0.0001', Adagrad(lr=0.0001))], 
-        'Adadelta':[('1.0', Adadelta(lr=1.0)), ('0.1', Adadelta(lr=0.1)), ('0.01', Adadelta(lr=0.01))], 
-        'Adam':[('0.001', Adam(lr=0.001)), ('0.0001', Adam(lr=0.0001)), ('0.00001', Adam(lr=0.00001))], 
-        'Adamax':[('0.002', Adamax(lr=0.002)), ('0.0002', Adamax(lr=0.0002)), ('0.00002', Adamax(lr=0.00002))], 
-        'Nadam':[('0.002', Nadam(lr=0.002)), ('0.0002', Nadam(lr=0.0002)), ('0.00002', Nadam(lr=0.00002))]
+        'RMSprop':[('0.0001', RMSprop(lr=0.0001)), ('0.00001', RMSprop(lr=0.00001))], 
+        'Adagrad':[('0.001', Adagrad(lr=0.001)), ('0.0001', Adagrad(lr=0.0001))], 
+        'Adadelta':[('0.1', Adadelta(lr=0.1)), ('0.01', Adadelta(lr=0.01))], 
+        'Adam':[('0.0001', Adam(lr=0.0001)), ('0.00001', Adam(lr=0.00001))], 
+        'Nadam':[('0.0002', Nadam(lr=0.0002)), ('0.00002', Nadam(lr=0.00002))]
 
     }
 
@@ -158,8 +156,8 @@ if __name__ == "__main__":
             resDict[key][optimizers[0]]['train'] = []
             resDict[key][optimizers[0]]['evaluate'] = []
 
-    samples = 10000
-    batch_size = 128
+    samples = 1000
+    batch_size = 32
 
     for i in range(5):        
         mid = random.randint(int(samples/2),len(data)-int(samples/2))
@@ -191,11 +189,11 @@ if __name__ == "__main__":
                     shuffle=True)
 
                 scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
-
+                print(scoreTrain)
                 scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
-
+                print(scoreEval)
                 resDict[name][lr]['train'].append(scoreTrain[1])
                 resDict[name][lr]['evaluate'].append(scoreEval[1])
 
-    with open('results.txt', 'w') as fp:
-        json.dump(resDict, fp, indent=4)
+                with open('results.txt', 'w') as fp:
+                    json.dump(resDict, fp, indent=4)
