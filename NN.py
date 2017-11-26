@@ -5,10 +5,11 @@ import numpy
 
 import keras
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Dropout, GaussianNoise
+from keras.layers import Dense, Activation, Dropout
 from keras.optimizers import SGD, RMSprop, Adagrad, Adadelta, Adam, Adamax, Nadam
-from keras.callbacks import ModelCheckpoint
-from keras.constraints import maxnorm
+from keras.regularizers import l2
+from keras.layers.normalization import BatchNormalization
+from keras import backend as K
 
 from sklearn.preprocessing import OneHotEncoder
 
@@ -74,28 +75,20 @@ def buildMatrixGen(data, nameDict, batch_size = 1):
                 dataOut = []
                 labelOut = []
 
-def genModel(input_dim, optimizer):
+def genModel(input_dim, namecount, optimizer):
     model = Sequential()
 
-    model.add(Dense(input_dim,input_dim=input_dim))
+    model.add(Dense(1024, input_dim=input_dim, kernel_regularizer=l2(l=0.01)))
+    model.add(BatchNormalization())
     model.add(Activation('relu'))
 
-    # model.add(Dropout(0.5))
+    model.add(Dropout(0.25))
 
-    # model.add(Dense(2048))
-    # model.add(Activation('relu'))
+    model.add(Dense(1024, kernel_regularizer=l2(l=0.01)))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
 
-    # model.add(Dropout(0.5))
-
-    # model.add(Dense(512))
-    # model.add(Activation('relu'))
-
-    # model.add(Dropout(0.5))
-
-    # model.add(Dense(128))
-    # model.add(Activation('relu'))
-
-    # model.add(Dropout(0.5))
+    model.add(Dropout(0.25))
 
     model.add(Dense(nameCount))
     model.add(Activation('softmax'))
@@ -107,6 +100,22 @@ def genModel(input_dim, optimizer):
     model.summary()
 
     return model
+
+def optimizer(name, val):
+    if name == "SGD":
+        return SGD(lr=val)
+    if name == "RMSprop":
+        return RMSprop(lr=val)
+    if name == "Adagrad":
+        return Adagrad(lr=val)
+    if name == "Adadelta":
+        return Adadelta(lr=val)
+    if name == "Adam":
+        return Adam(lr=val)
+    if name == "Adamax":
+        return Adamax(lr=val)
+    if name == "Nadam":
+        return Nadam(lr=val)
             
 if __name__ == "__main__":
 
@@ -136,13 +145,23 @@ if __name__ == "__main__":
 
     conn.close()
 
+    # optDict = {
+
+    #     'RMSprop':[('0.0001', RMSprop(lr=0.0001)), ('0.00001', RMSprop(lr=0.00001))], 
+    #     'Adagrad':[('0.001', Adagrad(lr=0.001)), ('0.0001', Adagrad(lr=0.0001))], 
+    #     'Adadelta':[('0.1', Adadelta(lr=0.1)), ('0.01', Adadelta(lr=0.01))], 
+    #     'Adam':[('0.0001', Adam(lr=0.0001)), ('0.00001', Adam(lr=0.00001))], 
+    #     'Nadam':[('0.0002', Nadam(lr=0.0002)), ('0.00002', Nadam(lr=0.00002))]
+
+    # }
+
     optDict = {
 
-        'RMSprop':[('0.0001', RMSprop(lr=0.0001)), ('0.00001', RMSprop(lr=0.00001))], 
-        'Adagrad':[('0.001', Adagrad(lr=0.001)), ('0.0001', Adagrad(lr=0.0001))], 
-        'Adadelta':[('0.1', Adadelta(lr=0.1)), ('0.01', Adadelta(lr=0.01))], 
-        'Adam':[('0.0001', Adam(lr=0.0001)), ('0.00001', Adam(lr=0.00001))], 
-        'Nadam':[('0.0002', Nadam(lr=0.0002)), ('0.00002', Nadam(lr=0.00002))]
+        'RMSprop':[0.0001, 0.00001], 
+        'Adagrad':[0.001, 0.0001], 
+        'Adadelta':[0.1, 0.01], 
+        'Adam':[0.0001, 0.00001], 
+        'Nadam':[0.0002, 0.00002]
 
     }
 
@@ -152,20 +171,22 @@ if __name__ == "__main__":
         resDict[key] = {}
         
         for optimizers in optDict[key]:
-            resDict[key][optimizers[0]] = {}
-            resDict[key][optimizers[0]]['train'] = []
-            resDict[key][optimizers[0]]['evaluate'] = []
+            resDict[key][optimizers] = {}
+            resDict[key][optimizers]['train'] = []
+            resDict[key][optimizers]['evaluate'] = []
 
-    samples = 1000
-    batch_size = 32
+    samples = 5000
+    # samples = len(data)
+    batch_size = 128
+
+    # nameDict = buildDict(dataTemp)
+    nameDict = buildDict(data)
+    nameCount = len(nameDict)
 
     for i in range(5):        
         mid = random.randint(int(samples/2),len(data)-int(samples/2))
 
         dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
-
-        nameDict = buildDict(dataTemp)
-        nameCount = len(nameDict)
 
         trainData = dataTemp[:int(0.9*len(dataTemp))]
 
@@ -178,9 +199,10 @@ if __name__ == "__main__":
         evalLabels = evalLabels.todense()
 
         for name, value in optDict.items():
-            for lr, optimizer in value:
 
-                model = genModel(nameCount+len(data[0])-3, optimizer)
+            for lr in value:
+
+                model = genModel(nameCount+len(data[0])-3, nameCount, optimizer(name, lr))
 
                 model.fit_generator(buildMatrixGen(trainData, nameDict, batch_size), 
                     epochs=100, 
@@ -194,6 +216,8 @@ if __name__ == "__main__":
                 print(scoreEval)
                 resDict[name][lr]['train'].append(scoreTrain[1])
                 resDict[name][lr]['evaluate'].append(scoreEval[1])
+
+                K.clear_session()
 
                 with open('results.txt', 'w') as fp:
                     json.dump(resDict, fp, indent=4)
