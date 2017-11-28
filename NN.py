@@ -3,12 +3,18 @@ from saltybet.process import process
 import sqlite3
 import numpy
 
+import tensorflow as tf
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
+
 import keras
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Dropout
+from keras.layers import Dense, Activation, Dropout, GaussianNoise
 from keras.optimizers import SGD, RMSprop, Adagrad, Adadelta, Adam, Adamax, Nadam
-from keras.regularizers import l2
+from keras.regularizers import l1, l2, l1_l2
 from keras.layers.normalization import BatchNormalization
+from keras.callbacks import EarlyStopping
 from keras import backend as K
 
 from sklearn.preprocessing import OneHotEncoder
@@ -16,9 +22,7 @@ from sklearn.preprocessing import OneHotEncoder
 from scipy import sparse
 
 import random
-
 import sys
-
 import json
 
 def buildDict(data):
@@ -32,9 +36,13 @@ def buildDict(data):
     namedict = {x[0]:x[1] for x in names}
     return namedict
 
-def buildMatrix(data, nameDict):
-    dataMat = sparse.lil_matrix((len(data),len(nameDict)+len(data[0])-3))
-    labelMat = sparse.lil_matrix((len(data),len(nameDict)))
+def buildMatrix(data, nameDict, isSparse=1):
+    if isSparse == 1:
+        dataMat = sparse.lil_matrix((len(data),len(nameDict)+len(data[0])-3))
+        labelMat = sparse.lil_matrix((len(data),len(nameDict)))
+    else:
+        dataMat = numpy.zeros((len(data),len(nameDict)+len(data[0])-3))
+        labelMat = numpy.zeros((len(data),len(nameDict)))
     rowlen = len(nameDict)
 
     for row, value in enumerate(data):
@@ -49,46 +57,38 @@ def buildMatrix(data, nameDict):
     
     return dataMat, labelMat
 
-def buildMatrixGen(data, nameDict, batch_size = 1):
-    rowLen = len(nameDict)
-    dataOut = []
-    labelOut = []
-
+def dataGen(data, labels, batch_size=1):
     while True:
-        count = 0
-        for value in data:
-            name1, name2, winner, *rest = value
-            dataRow = numpy.zeros(len(nameDict)+len(data[0])-3)
-            dataRow[nameDict[name1]] = -1
-            dataRow[nameDict[name2]] = 1
-            dataRow[rowLen:] = rest
-            label = numpy.zeros(len(nameDict))
-            if winner == name1:
-                label[nameDict[name1]] = 1
-            elif winner == name2:
-                label[nameDict[name2]] = 1
-            dataOut.append(dataRow)
-            labelOut.append(label)
-            count += 1
-            if count % batch_size == 0:
-                yield (numpy.array(dataOut),numpy.array(labelOut))
-                dataOut = []
-                labelOut = []
+        for i in range(data.shape[0]):
+            if i != 0 and i % batch_size == 0:
+                yield (data[i-batch_size:i].todense(), labels[i-batch_size:i].todense())
 
 def genModel(input_dim, namecount, optimizer):
     model = Sequential()
 
-    model.add(Dense(1024, input_dim=input_dim, kernel_regularizer=l2(l=0.01)))
+    model.add(Dense(int(input_dim/4), input_dim=input_dim, kernel_regularizer=l2(l=0.001)))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
 
-    model.add(Dropout(0.25))
+    model.add(Dropout(0.50))
 
-    model.add(Dense(1024, kernel_regularizer=l2(l=0.01)))
+    model.add(Dense(int(input_dim/2), kernel_regularizer=l2(l=0.001)))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
 
-    model.add(Dropout(0.25))
+    model.add(Dropout(0.50))
+
+    # model.add(Dense(int(input_dim/4), kernel_regularizer=l2(l=0.001)))
+    # model.add(BatchNormalization())
+    # model.add(Activation('relu'))
+
+    # model.add(Dropout(0.50))
+
+    # model.add(Dense(int(input_dim/8), kernel_regularizer=l2(l=0.001)))
+    # model.add(BatchNormalization())
+    # model.add(Activation('relu'))
+
+    # model.add(Dropout(0.50))
 
     model.add(Dense(nameCount))
     model.add(Activation('softmax'))
@@ -133,36 +133,22 @@ if __name__ == "__main__":
 
     data = cursor.execute('''
 
-        SELECT redName, blueName, winner, 
-            red.mu, red.sigma, 
-            blue.mu, blue.sigma 
+        SELECT redName, blueName, winner 
             from fights 
-            INNER JOIN characters AS red ON fights.redName = red.name and fights.mode = red.mode and fights.mode = "Matchmaking" 
-            INNER JOIN characters AS blue ON fights.blueName = blue.name and fights.mode = blue.mode and fights.mode = "Matchmaking" 
-            WHERE fights.mode = "Matchmaking" and red.wins+red.losses >= 10 and blue.wins+blue.losses >= 10 and redName != blueName;
+            INNER JOIN characters AS red ON fights.redName = red.name and fights.mode = red.mode and (fights.mode = "Matchmaking" or fights.mode = "Tournament")
+            INNER JOIN characters AS blue ON fights.blueName = blue.name and fights.mode = blue.mode and (fights.mode = "Matchmaking" or fights.mode = "Tournament")
+            WHERE (fights.mode = "Matchmaking" or fights.mode = "Tournament") and red.wins+red.losses >= 10 and blue.wins+blue.losses >= 10 and redName != blueName;
 
     ''').fetchall()
 
     conn.close()
 
-    # optDict = {
-
-    #     'RMSprop':[('0.0001', RMSprop(lr=0.0001)), ('0.00001', RMSprop(lr=0.00001))], 
-    #     'Adagrad':[('0.001', Adagrad(lr=0.001)), ('0.0001', Adagrad(lr=0.0001))], 
-    #     'Adadelta':[('0.1', Adadelta(lr=0.1)), ('0.01', Adadelta(lr=0.01))], 
-    #     'Adam':[('0.0001', Adam(lr=0.0001)), ('0.00001', Adam(lr=0.00001))], 
-    #     'Nadam':[('0.0002', Nadam(lr=0.0002)), ('0.00002', Nadam(lr=0.00002))]
-
-    # }
-
     optDict = {
-
-        'RMSprop':[0.0001, 0.00001], 
-        'Adagrad':[0.001, 0.0001], 
-        'Adadelta':[0.1, 0.01], 
-        'Adam':[0.0001, 0.00001], 
-        'Nadam':[0.0002, 0.00002]
-
+ 
+        'Adagrad':[0.001], 
+        'Adam':[0.0001], 
+        'Adamax':[0.0002], 
+        'Nadam':[0.00002]
     }
 
     resDict = {}
@@ -175,11 +161,9 @@ if __name__ == "__main__":
             resDict[key][optimizers]['train'] = []
             resDict[key][optimizers]['evaluate'] = []
 
-    samples = 5000
-    # samples = len(data)
-    batch_size = 128
+    samples = 100000
+    batch_size = 1024
 
-    # nameDict = buildDict(dataTemp)
     nameDict = buildDict(data)
     nameCount = len(nameDict)
 
@@ -188,15 +172,14 @@ if __name__ == "__main__":
 
         dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
 
-        trainData = dataTemp[:int(0.9*len(dataTemp))]
+        # nameDict = buildDict(dataTemp)
+        # nameCount = len(nameDict)
 
-        trainEvalData, trainEvalLabels = buildMatrix(dataTemp[int(0.9*0.9*len(dataTemp)):int(0.9*len(dataTemp))], nameDict)
-        trainEvalData = trainEvalData.todense()
-        trainEvalLabels = trainEvalLabels.todense()
+        trainData, trainLabels = buildMatrix(dataTemp[:int(0.9*len(dataTemp))], nameDict)
 
-        evalData, evalLabels = buildMatrix(dataTemp[int(0.9*len(dataTemp)):], nameDict)
-        evalData = evalData.todense()
-        evalLabels = evalLabels.todense()
+        trainEvalData, trainEvalLabels = buildMatrix(dataTemp[int(0.9*0.9*len(dataTemp)):int(0.9*len(dataTemp))], nameDict, isSparse=0)
+
+        evalData, evalLabels = buildMatrix(dataTemp[int(0.9*len(dataTemp)):], nameDict, isSparse=0)
 
         for name, value in optDict.items():
 
@@ -204,11 +187,13 @@ if __name__ == "__main__":
 
                 model = genModel(nameCount+len(data[0])-3, nameCount, optimizer(name, lr))
 
-                model.fit_generator(buildMatrixGen(trainData, nameDict, batch_size), 
-                    epochs=100, 
-                    steps_per_epoch=len(trainData)/batch_size, 
-                    validation_data=(evalData, evalLabels),
-                    shuffle=True)
+                early_stopping = EarlyStopping(monitor='loss',min_delta=0.005, patience=10)
+
+                model.fit_generator(dataGen(trainData, trainLabels, batch_size), 
+                    epochs=1000, 
+                    steps_per_epoch=trainData.shape[0]/batch_size, 
+                    validation_data=(evalData, evalLabels), 
+                    callbacks=[early_stopping])
 
                 scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
                 print(scoreTrain)
