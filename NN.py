@@ -10,7 +10,7 @@ session = tf.Session(config=config)
 
 import keras
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Dropout, GaussianNoise
+from keras.layers import Input, Dense, Activation, Dropout, GaussianNoise
 from keras.optimizers import SGD, RMSprop, Adagrad, Adadelta, Adam, Adamax, Nadam
 from keras.regularizers import l1, l2, l1_l2
 from keras.layers.normalization import BatchNormalization
@@ -66,29 +66,18 @@ def dataGen(data, labels, batch_size=1):
 def genModel(input_dim, namecount, optimizer):
     model = Sequential()
 
-    model.add(Dense(int(input_dim/4), input_dim=input_dim, kernel_regularizer=l2(l=0.001)))
+    # model.add(Dense(2048, input_dim=input_dim, kernel_regularizer=l1_l2(l1=0.01, l2=0.01)))
+    model.add(Dense(input_dim, input_dim=input_dim, kernel_regularizer=l2(l=0.0001)))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
 
     model.add(Dropout(0.50))
 
-    model.add(Dense(int(input_dim/2), kernel_regularizer=l2(l=0.001)))
+    model.add(Dense(input_dim, kernel_regularizer=l2(0.0001)))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
 
     model.add(Dropout(0.50))
-
-    # model.add(Dense(int(input_dim/4), kernel_regularizer=l2(l=0.001)))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
-
-    # model.add(Dropout(0.50))
-
-    # model.add(Dense(int(input_dim/8), kernel_regularizer=l2(l=0.001)))
-    # model.add(BatchNormalization())
-    # model.add(Activation('relu'))
-
-    # model.add(Dropout(0.50))
 
     model.add(Dense(nameCount))
     model.add(Activation('softmax'))
@@ -133,7 +122,9 @@ if __name__ == "__main__":
 
     data = cursor.execute('''
 
-        SELECT redName, blueName, winner 
+        SELECT redName, blueName, winner, 
+            CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS winrate, red.mu, red.sigma, 
+            CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS winrate, blue.mu, blue.sigma 
             from fights 
             INNER JOIN characters AS red ON fights.redName = red.name and fights.mode = red.mode and (fights.mode = "Matchmaking" or fights.mode = "Tournament")
             INNER JOIN characters AS blue ON fights.blueName = blue.name and fights.mode = blue.mode and (fights.mode = "Matchmaking" or fights.mode = "Tournament")
@@ -143,12 +134,22 @@ if __name__ == "__main__":
 
     conn.close()
 
+    # optDict = {
+ 
+
+    #     'Adagrad':[0.01, 0.001, 0.0001], 
+    #     'Adam':[0.001, 0.0001, 0.00001], 
+    #     'Adamax':[0.002, 0.0002, 0.00002], 
+    #     'Nadam':[0.002, 0.0002, 0.00002]
+    # }
+
     optDict = {
  
-        'Adagrad':[0.001], 
-        'Adam':[0.0001], 
+
+        'Adagrad':[0.01, 0.001], 
+        'Adam':[0.00001, 0.000001], 
         'Adamax':[0.0002], 
-        'Nadam':[0.00002]
+        'Nadam':[0.0002, 0.00002, 0.000002]
     }
 
     resDict = {}
@@ -161,19 +162,20 @@ if __name__ == "__main__":
             resDict[key][optimizers]['train'] = []
             resDict[key][optimizers]['evaluate'] = []
 
-    samples = 100000
-    batch_size = 1024
+    # samples = len(data)
+    samples = 10000
+    batch_size = 512
 
-    nameDict = buildDict(data)
-    nameCount = len(nameDict)
+    # nameDict = buildDict(data)
+    # nameCount = len(nameDict)
 
     for i in range(5):        
         mid = random.randint(int(samples/2),len(data)-int(samples/2))
 
         dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
 
-        # nameDict = buildDict(dataTemp)
-        # nameCount = len(nameDict)
+        nameDict = buildDict(dataTemp)
+        nameCount = len(nameDict)
 
         trainData, trainLabels = buildMatrix(dataTemp[:int(0.9*len(dataTemp))], nameDict)
 
@@ -187,10 +189,10 @@ if __name__ == "__main__":
 
                 model = genModel(nameCount+len(data[0])-3, nameCount, optimizer(name, lr))
 
-                early_stopping = EarlyStopping(monitor='loss',min_delta=0.005, patience=10)
+                early_stopping = EarlyStopping(monitor='loss',min_delta=0.001, patience=10)
 
                 model.fit_generator(dataGen(trainData, trainLabels, batch_size), 
-                    epochs=1000, 
+                    epochs=250, 
                     steps_per_epoch=trainData.shape[0]/batch_size, 
                     validation_data=(evalData, evalLabels), 
                     callbacks=[early_stopping])
