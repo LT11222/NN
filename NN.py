@@ -9,13 +9,14 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 import keras
-from keras.models import Sequential
+from keras.models import Model
 from keras.layers import Input, Dense, Activation, Dropout, GaussianNoise
 from keras.optimizers import SGD, RMSprop, Adagrad, Adadelta, Adam, Adamax, Nadam
 from keras.regularizers import l1, l2, l1_l2
 from keras.layers.normalization import BatchNormalization
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, TensorBoard
 from keras import backend as K
+from keras.utils import plot_model
 
 from sklearn.preprocessing import OneHotEncoder
 
@@ -37,54 +38,93 @@ def buildDict(data):
     return namedict
 
 def buildMatrix(data, nameDict, isSparse=1):
+
     if isSparse == 1:
-        dataMat = sparse.lil_matrix((len(data),len(nameDict)+len(data[0])-3))
+        nameMat = sparse.lil_matrix((len(data),len(nameDict)))
         labelMat = sparse.lil_matrix((len(data),len(nameDict)))
     else:
-        dataMat = numpy.zeros((len(data),len(nameDict)+len(data[0])-3))
+        nameMat = numpy.zeros((len(data),len(nameDict)))
         labelMat = numpy.zeros((len(data),len(nameDict)))
-    rowlen = len(nameDict)
+
+    dataMat = numpy.zeros((len(data),len(data[0])-3))
 
     for row, value in enumerate(data):
         name1, name2, winner, *rest = value
-        dataMat[row,nameDict[name1]] = -1
-        dataMat[row,nameDict[name2]] = 1
-        dataMat[row,rowlen:] = rest
+        nameMat[row,nameDict[name1]] = 1
+        nameMat[row,nameDict[name2]] = 1
+        dataMat[row] = rest
         if winner == name1:
             labelMat[row,nameDict[name1]] = 1
         elif winner == name2:
             labelMat[row,nameDict[name2]] = 1
     
-    return dataMat, labelMat
+    return [[nameMat, dataMat], [labelMat]]
 
 def dataGen(data, labels, batch_size=1):
     while True:
-        for i in range(data.shape[0]):
+        for i in range(data[0].shape[0]):
             if i != 0 and i % batch_size == 0:
-                yield (data[i-batch_size:i].todense(), labels[i-batch_size:i].todense())
+                yield [[data[0][i-batch_size:i].todense(), data[1][i-batch_size:i]], [labels[0][i-batch_size:i].todense()]]
 
-def genModel(input_dim, namecount, optimizer):
-    model = Sequential()
+def genModel(nameCount, dataCount, optimizer):
 
-    # model.add(Dense(2048, input_dim=input_dim, kernel_regularizer=l1_l2(l1=0.01, l2=0.01)))
-    model.add(Dense(input_dim, input_dim=input_dim, kernel_regularizer=l2(l=0.0001)))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
+    units = int(nameCount/8)
+    # units = nameCount
 
-    model.add(Dropout(0.50))
+    nameInput = Input(shape=(nameCount,), name='nameInput')
+    x = Dense(units, kernel_regularizer=l2(l=0.001))(nameInput)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
 
-    model.add(Dense(input_dim, kernel_regularizer=l2(0.0001)))
-    model.add(BatchNormalization())
-    model.add(Activation('relu'))
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
 
-    model.add(Dropout(0.50))
+    x = Dense(nameCount)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    nameOutput = Dropout(0.5, name='nameOutput')(x)
 
-    model.add(Dense(nameCount))
-    model.add(Activation('softmax'))
+    dataInput = Input(shape=(dataCount,), name='dataInput')
+    x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(dataInput)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    # x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    x = Dense(dataCount)(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    dataOutput = Dropout(0.5, name='dataOutput')(x)
+
+    x = keras.layers.concatenate([nameOutput, dataOutput])
+
+    x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    x = Dense(nameCount)(x)
+    mainOutput = Activation('softmax', name='mainOutput')(x)
+
+    model = Model(inputs=[nameInput, dataInput], outputs=[mainOutput])
 
     model.compile(loss='categorical_crossentropy',
         optimizer = optimizer,
         metrics=['acc'])
+
+    plot_model(model, to_file='model.png')
 
     model.summary()
 
@@ -134,22 +174,18 @@ if __name__ == "__main__":
 
     conn.close()
 
-    # optDict = {
- 
-
+    # optDict = { 
     #     'Adagrad':[0.01, 0.001, 0.0001], 
     #     'Adam':[0.001, 0.0001, 0.00001], 
     #     'Adamax':[0.002, 0.0002, 0.00002], 
     #     'Nadam':[0.002, 0.0002, 0.00002]
     # }
 
-    optDict = {
- 
-
+    optDict = { 
         'Adagrad':[0.01, 0.001], 
-        'Adam':[0.00001, 0.000001], 
-        'Adamax':[0.0002], 
-        'Nadam':[0.0002, 0.00002, 0.000002]
+        'Adam':[0.0001], 
+        'Adamax':[0.002, 0.0002], 
+        'Nadam':[0.0002]
     }
 
     resDict = {}
@@ -164,10 +200,9 @@ if __name__ == "__main__":
 
     # samples = len(data)
     samples = 10000
-    batch_size = 512
+    batch_size = 1024
 
     # nameDict = buildDict(data)
-    # nameCount = len(nameDict)
 
     for i in range(5):        
         mid = random.randint(int(samples/2),len(data)-int(samples/2))
@@ -175,7 +210,6 @@ if __name__ == "__main__":
         dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
 
         nameDict = buildDict(dataTemp)
-        nameCount = len(nameDict)
 
         trainData, trainLabels = buildMatrix(dataTemp[:int(0.9*len(dataTemp))], nameDict)
 
@@ -187,15 +221,16 @@ if __name__ == "__main__":
 
             for lr in value:
 
-                model = genModel(nameCount+len(data[0])-3, nameCount, optimizer(name, lr))
+                model = genModel(trainData[0].shape[1], trainData[1].shape[1], optimizer(name, lr))
 
-                early_stopping = EarlyStopping(monitor='loss',min_delta=0.001, patience=10)
+                earlystopping = EarlyStopping(monitor='loss',min_delta=0.001, patience=10)
+                tensorboard = TensorBoard(log_dir='./logs/{}/{}/{}'.format(name, str(lr).replace('.', '_'), i))
 
                 model.fit_generator(dataGen(trainData, trainLabels, batch_size), 
                     epochs=250, 
-                    steps_per_epoch=trainData.shape[0]/batch_size, 
+                    steps_per_epoch=trainData[0].shape[0]/batch_size, 
                     validation_data=(evalData, evalLabels), 
-                    callbacks=[early_stopping])
+                    callbacks=[earlystopping, tensorboard])
 
                 scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
                 print(scoreTrain)
