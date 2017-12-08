@@ -68,8 +68,8 @@ def dataGen(data, labels, batch_size=1):
 
 def genModel(nameCount, dataCount, optimizer):
 
-    units = int(nameCount/8)
-    # units = nameCount
+    # units = int(nameCount/8)
+    units = nameCount
 
     nameInput = Input(shape=(nameCount,), name='nameInput')
     x = Dense(units, kernel_regularizer=l2(l=0.001))(nameInput)
@@ -82,10 +82,8 @@ def genModel(nameCount, dataCount, optimizer):
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
-    x = Dense(nameCount)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    nameOutput = Dropout(0.5, name='nameOutput')(x)
+    nameOutput = Dense(nameCount, name='nameOutput')(x)
+    # nameOutput = Activation('relu', name='nameOutput')(x)
 
     dataInput = Input(shape=(dataCount,), name='dataInput')
     x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(dataInput)
@@ -98,10 +96,8 @@ def genModel(nameCount, dataCount, optimizer):
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
-    x = Dense(dataCount)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    dataOutput = Dropout(0.5, name='dataOutput')(x)
+    dataOutput = Dense(dataCount, name='dataOutput')(x)
+    # dataOutput = Activation('relu', name='dataOutput')(x)
 
     x = keras.layers.concatenate([nameOutput, dataOutput])
 
@@ -180,12 +176,10 @@ if __name__ == "__main__":
     #     'Adamax':[0.002, 0.0002, 0.00002], 
     #     'Nadam':[0.002, 0.0002, 0.00002]
     # }
-
+    
     optDict = { 
-        'Adagrad':[0.01, 0.001], 
-        'Adam':[0.0001], 
-        'Adamax':[0.002, 0.0002], 
-        'Nadam':[0.0002]
+        # 'Adam':[0.001, 0.0001, 0.00001]
+        'Adam':[0.0001, 0.00001]
     }
 
     resDict = {}
@@ -199,15 +193,17 @@ if __name__ == "__main__":
             resDict[key][optimizers]['evaluate'] = []
 
     # samples = len(data)
-    samples = 10000
-    batch_size = 1024
+    samples = 100
+    batch_size = 64
 
     # nameDict = buildDict(data)
 
     for i in range(5):        
-        mid = random.randint(int(samples/2),len(data)-int(samples/2))
+        # mid = random.randint(int(samples/2),len(data)-int(samples/2))
 
-        dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
+        # dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
+
+        dataTemp = random.sample(data, samples)
 
         nameDict = buildDict(dataTemp)
 
@@ -227,10 +223,10 @@ if __name__ == "__main__":
                 tensorboard = TensorBoard(log_dir='./logs/{}/{}/{}'.format(name, str(lr).replace('.', '_'), i))
 
                 model.fit_generator(dataGen(trainData, trainLabels, batch_size), 
-                    epochs=250, 
+                    epochs=500, 
                     steps_per_epoch=trainData[0].shape[0]/batch_size, 
-                    validation_data=(evalData, evalLabels), 
-                    callbacks=[earlystopping, tensorboard])
+                    validation_data=[evalData, evalLabels], 
+                    callbacks=[tensorboard])
 
                 scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
                 print(scoreTrain)
@@ -239,7 +235,33 @@ if __name__ == "__main__":
                 resDict[name][lr]['train'].append(scoreTrain[1])
                 resDict[name][lr]['evaluate'].append(scoreEval[1])
 
+                res = model.predict(trainEvalData)
+
+                count = 0
+                for i, match in enumerate(res):                  
+                    largestI = 0
+                    largestValue = 0
+                    for j, value in enumerate(match):
+                        if value > largestValue:
+                            largestValue = value
+                            largestI = j
+
+                    temp = numpy.zeros(match.shape)
+                    temp[largestI] = 1
+
+                    print(trainEvalData[0][i])
+                    print(trainEvalLabels[0][i])
+                    print(temp)
+                    print('--------------')
+
+                    if numpy.all(trainEvalLabels[0][i] == temp):
+                        count += 1
+                    
+                print(count)
+
                 K.clear_session()
+
+                sys.exit()
 
                 with open('results.txt', 'w') as fp:
                     json.dump(resDict, fp, indent=4)
