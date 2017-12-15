@@ -68,8 +68,8 @@ def dataGen(data, labels, batch_size=1):
 
 def genModel(nameCount, dataCount, optimizer):
 
-    # units = int(nameCount/8)
-    units = nameCount
+    units = int(nameCount/8)
+    # units = nameCount
 
     nameInput = Input(shape=(nameCount,), name='nameInput')
     x = Dense(units, kernel_regularizer=l2(l=0.001))(nameInput)
@@ -82,8 +82,37 @@ def genModel(nameCount, dataCount, optimizer):
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
     nameOutput = Dense(nameCount, name='nameOutput')(x)
-    # nameOutput = Activation('relu', name='nameOutput')(x)
 
     dataInput = Input(shape=(dataCount,), name='dataInput')
     x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(dataInput)
@@ -96,8 +125,17 @@ def genModel(nameCount, dataCount, optimizer):
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
+    # x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
     dataOutput = Dense(dataCount, name='dataOutput')(x)
-    # dataOutput = Activation('relu', name='dataOutput')(x)
 
     x = keras.layers.concatenate([nameOutput, dataOutput])
 
@@ -105,6 +143,16 @@ def genModel(nameCount, dataCount, optimizer):
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
 
     # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
     # x = BatchNormalization()(x)
@@ -141,7 +189,30 @@ def optimizer(name, val):
         return Adamax(lr=val)
     if name == "Nadam":
         return Nadam(lr=val)
-            
+
+def predict(model, data, labels):
+    res = model.predict(data)
+
+    data = data[0]
+    labels = labels[0]
+
+    count = 0
+    total = 0
+
+    for i in range(data.shape[0]):
+        dataVals = numpy.where(data[i])[0]
+        labelVals = numpy.where(labels[i])[0]
+
+        if res[i][dataVals[0]] > res[i][dataVals[1]] and labels[i][dataVals[0]] == 1:
+            count += 1
+
+        elif res[i][dataVals[1]] > res[i][dataVals[0]] and labels[i][dataVals[1]] == 1:
+            count += 1
+
+        total += 1
+
+    print(count/total)
+
 if __name__ == "__main__":
 
     try:
@@ -178,8 +249,7 @@ if __name__ == "__main__":
     # }
     
     optDict = { 
-        # 'Adam':[0.001, 0.0001, 0.00001]
-        'Adam':[0.0001, 0.00001]
+        'Adam':[0.00001]
     }
 
     resDict = {}
@@ -193,8 +263,8 @@ if __name__ == "__main__":
             resDict[key][optimizers]['evaluate'] = []
 
     # samples = len(data)
-    samples = 100
-    batch_size = 64
+    samples = 10000
+    batch_size = 512
 
     # nameDict = buildDict(data)
 
@@ -223,41 +293,23 @@ if __name__ == "__main__":
                 tensorboard = TensorBoard(log_dir='./logs/{}/{}/{}'.format(name, str(lr).replace('.', '_'), i))
 
                 model.fit_generator(dataGen(trainData, trainLabels, batch_size), 
-                    epochs=500, 
+                    epochs=100, 
                     steps_per_epoch=trainData[0].shape[0]/batch_size, 
                     validation_data=[evalData, evalLabels], 
-                    callbacks=[tensorboard])
+                    callbacks=[earlystopping, tensorboard])
 
                 scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
                 print(scoreTrain)
                 scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
                 print(scoreEval)
+
+                print('')
+
                 resDict[name][lr]['train'].append(scoreTrain[1])
                 resDict[name][lr]['evaluate'].append(scoreEval[1])
 
-                res = model.predict(trainEvalData)
-
-                count = 0
-                for i, match in enumerate(res):                  
-                    largestI = 0
-                    largestValue = 0
-                    for j, value in enumerate(match):
-                        if value > largestValue:
-                            largestValue = value
-                            largestI = j
-
-                    temp = numpy.zeros(match.shape)
-                    temp[largestI] = 1
-
-                    print(trainEvalData[0][i])
-                    print(trainEvalLabels[0][i])
-                    print(temp)
-                    print('--------------')
-
-                    if numpy.all(trainEvalLabels[0][i] == temp):
-                        count += 1
-                    
-                print(count)
+                predict(model, trainEvalData, trainEvalLabels)
+                predict(model, evalData, evalLabels)
 
                 K.clear_session()
 
