@@ -15,10 +15,10 @@ if __name__ == "__main__":
 
     optDict = backend.genOptDict()
 
-    samples = 50000
+    samples = 10000
     batch_size = 512
 
-    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data, samples)
+    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data[:len(data)-samples], backend.buildDict(data), samples)
 
     for name, value in optDict.items():
         for lr in value:
@@ -31,7 +31,7 @@ if __name__ == "__main__":
             tensorboard = TensorBoard(log_dir='./logs/{}/{}'.format(name, str(lr).replace('.', '_')))
 
             model.fit_generator(backend.dataGenerator(trainData, trainLabels, batch_size), 
-                epochs=100, 
+                epochs=1000,
                 steps_per_epoch=trainData[0].shape[0]/batch_size, 
                 validation_data=[evalData, evalLabels], 
                 callbacks=[checkpoint, earlystopping, tensorboard])

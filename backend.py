@@ -52,7 +52,7 @@ def buildMatrix(data, nameDict, isSparse=1):
     
     return [[nameMat, dataMat], [labelMat]]
 
-def predict(model, data, labels):
+def predict(model, data, labels, cutoff = 0.5):
     res = model.predict(data)
 
     data = data[0]
@@ -61,18 +61,25 @@ def predict(model, data, labels):
     count = 0
     total = 0
 
+    cutoff = 0.5
+
     for i in range(data.shape[0]):
         dataVals = numpy.where(data[i])[0]
         labelVals = numpy.where(labels[i])[0]
 
-        if res[i][dataVals[0]] > res[i][dataVals[1]] and labels[i][dataVals[0]] == 1:
+        if res[i][dataVals[0]] - res[i][dataVals[1]] > cutoff and labels[i][dataVals[0]] == 1:
             count += 1
 
-        elif res[i][dataVals[1]] > res[i][dataVals[0]] and labels[i][dataVals[1]] == 1:
+        elif res[i][dataVals[1]] - res[i][dataVals[0]] > cutoff and labels[i][dataVals[1]] == 1:
             count += 1
 
-        total += 1
+        if res[i][dataVals[0]] - res[i][dataVals[1]] > cutoff or res[i][dataVals[1]] - res[i][dataVals[0]] > cutoff:
+            total += 1
 
+        # total += 1
+
+    print(total)
+    print(data.shape[0])
     print(count/total)
 
 def dataGenerator(data, labels, batch_size=1):
@@ -127,15 +134,12 @@ def loadData(dbPath='data/data.db'):
 
     return data
 
-def makeData(data, samples=10000):
+def makeData(data, nameDict, samples=10000):
     # mid = random.randint(int(samples/2),len(data)-int(samples/2))
 
     # dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
 
     dataTemp = random.sample(data, samples)
-
-    # nameDict = buildDict(dataTemp)
-    nameDict = buildDict(data)
 
     trainData, trainLabels = buildMatrix(dataTemp[:int(0.9*len(dataTemp))], nameDict)
 
@@ -151,42 +155,42 @@ def genModel(nameCount, dataCount, optimizer):
     # units = nameCount
 
     nameInput = Input(shape=(nameCount,), name='nameInput')
-    x = Dense(units, kernel_regularizer=l2(l=0.001))(nameInput)
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(nameInput)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
 
-    x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Dropout(0.5)(x)
-
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Dropout(0.5)(x)
-
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Dropout(0.5)(x)
-
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Dropout(0.5)(x)
-
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
@@ -194,22 +198,22 @@ def genModel(nameCount, dataCount, optimizer):
     nameOutput = Dense(nameCount, name='nameOutput')(x)
 
     dataInput = Input(shape=(dataCount,), name='dataInput')
-    x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(dataInput)
+    x = Dense(dataCount, kernel_regularizer=l2(l=0.0001))(dataInput)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(x)
+    x = Dense(dataCount, kernel_regularizer=l2(l=0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    # x = Dense(dataCount, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
-    # x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Dropout(0.5)(x)
-
-    # x = Dense(dataCount, kernel_regularizer=l2(l=0.001))(x)
+    # x = Dense(dataCount, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
@@ -218,22 +222,22 @@ def genModel(nameCount, dataCount, optimizer):
 
     x = keras.layers.concatenate([nameOutput, dataOutput])
 
-    x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.5)(x)
+
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)
 
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Dropout(0.5)(x)
-
-    # x = Dense(units, kernel_regularizer=l2(l=0.001))(x)
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
     # x = Activation('relu')(x)
     # x = Dropout(0.5)(x)

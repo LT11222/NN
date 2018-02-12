@@ -10,12 +10,12 @@ if __name__ == "__main__":
     samples = 10000
     batch_size = 128
 
-    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data, samples)
+    testData, testLabels, testEvalData, testEvalLabels, evalData, evalLabels = backend.makeData(data[len(data)-samples:], backend.buildDict(data), samples)
 
     for name, value in optDict.items():
         for lr in value:
 
-            model = backend.genModel(trainData[0].shape[1], trainData[1].shape[1], backend.optimizer(name, lr))
+            model = backend.genModel(testData[0].shape[1], testData[1].shape[1], backend.optimizer(name, lr))
 
             while True:
 
@@ -24,14 +24,14 @@ if __name__ == "__main__":
                 except:
                     continue
 
-                scoreTrain = model.evaluate(trainEvalData, trainEvalLabels, batch_size=batch_size)
-                print(scoreTrain)
+                scoretest = model.evaluate(testEvalData, testEvalLabels, batch_size=batch_size)
+                print(scoretest)
                 scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
                 print(scoreEval)
 
                 print('')
 
-                backend.predict(model, trainEvalData, trainEvalLabels)
+                backend.predict(model, testEvalData, testEvalLabels)
                 backend.predict(model, evalData, evalLabels)
 
                 print('')
