@@ -99,3 +99,7 @@ config.cfg
 *.db-journal
 *.json
 nn/
+nn_win10/
+logs/
+models/
+*.png
