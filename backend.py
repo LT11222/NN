@@ -4,6 +4,7 @@ import random
 
 import numpy
 from scipy import sparse
+import pandas
 
 import tensorflow as tf
 config = tf.ConfigProto()
@@ -132,7 +133,13 @@ def loadData(dbPath='data/data.db'):
 
     conn.close()
 
-    return data
+    df = pandas.DataFrame(data)
+
+    for value in [4,5,7,8]:
+        df[value] = (df[value]-df[value].min()) / (df[value].max()-df[value].min())
+
+    # return data
+    return df.values.tolist()
 
 def makeData(data, nameDict, samples=10000):
     # mid = random.randint(int(samples/2),len(data)-int(samples/2))
@@ -170,20 +177,20 @@ def genModel(nameCount, dataCount, optimizer):
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
 
-    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.5)(x)
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
 
-    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.5)(x)
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
 
-    x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.5)(x)
+    # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
+    # x = Dropout(0.5)(x)
 
     # x = Dense(units, kernel_regularizer=l2(l=0.0001))(x)
     # x = BatchNormalization()(x)
