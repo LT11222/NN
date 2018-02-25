@@ -85,6 +85,12 @@ def predict(model, data, labels, cutoff = 0.5):
 
 def dataGenerator(data, labels, batch_size=1):
     while True:
+
+        index = list(range(data[0].shape[0]))
+        random.shuffle(index)
+        data = [data[0][index], data[1][index]]
+        labels = [labels[0][index]]
+
         for i in range(data[0].shape[0]):
             if i != 0 and i % batch_size == 0:
                 yield [[data[0][i-batch_size:i].todense(), data[1][i-batch_size:i]], [labels[0][i-batch_size:i].todense()]]
