@@ -11,6 +11,9 @@ from keras.regularizers import l2
 from keras.layers.normalization import BatchNormalization
 from keras.utils import plot_model
 
+from keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint
+from keras.models import load_model
+
 def optimizer(name, val):
     if name == "SGD":
         return SGD(lr=val)

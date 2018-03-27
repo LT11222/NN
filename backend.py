@@ -91,13 +91,6 @@ def dataGenerator(data, labels, batch_size=1):
             if i != 0 and i % batch_size == 0:
                 yield [[data[0][i-batch_size:i].todense(), data[1][i-batch_size:i]], [labels[0][i-batch_size:i].todense()]]
 
-def genOptDict():
-    optDict = { 
-        'Adam':[0.0001]
-    }
-
-    return optDict
-
 def loadData(dbPath='data/data.db'):
 
     conn = sqlite3.connect(dbPath)
@@ -128,11 +121,7 @@ def loadData(dbPath='data/data.db'):
 
     # return data
 
-def makeData(data, nameDict, samples=10000):
-    # mid = random.randint(int(samples/2),len(data)-int(samples/2))
-
-    # dataTemp = data[mid-int(samples/2):mid+int(samples/2)]
-
+def makeDataTrain(data, nameDict, samples=10000):
     dataTemp = random.sample(data, samples)
 
     trainData, trainLabels = buildMatrix(dataTemp[:int(0.9*len(dataTemp))], nameDict)
@@ -142,3 +131,10 @@ def makeData(data, nameDict, samples=10000):
     evalData, evalLabels = buildMatrix(dataTemp[int(0.9*len(dataTemp)):], nameDict, isSparse=0)
 
     return trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels
+
+def makeDataEval(data, nameDict, samples=10000):
+    dataTemp = random.sample(data, samples)
+
+    evalData, evalLabels = buildMatrix(dataTemp, nameDict, isSparse=0)
+
+    return evalData, evalLabels
