@@ -6,6 +6,16 @@ import numpy
 from scipy import sparse
 import pandas
 
+import configparser
+
+def readConfig():
+    config = configparser.RawConfigParser()
+    config.read("config/config.cfg")
+    samples = int(config.get("Saltybet", "samples"))
+    testsamples = int(config.get("Saltybet", "testsamples"))
+
+    return samples, testsamples
+
 def buildDict(data):
     data = [x[:2] for x in data]
     names = [x[0] for x in data]
@@ -58,7 +68,7 @@ def predict(model, data, labels, cutoff = 0.5):
     count = 0
     total = 0
 
-    cutoff = 0.0
+    cutoff = 0.5
 
     for i in range(data.shape[0]):
         dataVals = numpy.where(data[i])[0]
@@ -121,20 +131,16 @@ def loadData(dbPath='data/data.db'):
 
     # return data
 
-def makeDataTrain(data, nameDict, samples=10000):
-    dataTemp = random.sample(data, samples)
+def makeDataTrain(data, nameDict):
+    trainData, trainLabels = buildMatrix(data[:int(0.9*len(data))], nameDict)
 
-    trainData, trainLabels = buildMatrix(dataTemp[:int(0.9*len(dataTemp))], nameDict)
+    trainEvalData, trainEvalLabels = buildMatrix(data[int(0.9*0.9*len(data)):int(0.9*len(data))], nameDict, isSparse=0)
 
-    trainEvalData, trainEvalLabels = buildMatrix(dataTemp[int(0.9*0.9*len(dataTemp)):int(0.9*len(dataTemp))], nameDict, isSparse=0)
-
-    evalData, evalLabels = buildMatrix(dataTemp[int(0.9*len(dataTemp)):], nameDict, isSparse=0)
+    evalData, evalLabels = buildMatrix(data[int(0.9*len(data)):], nameDict, isSparse=0)
 
     return trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels
 
-def makeDataEval(data, nameDict, samples=10000):
-    dataTemp = random.sample(data, samples)
-
-    evalData, evalLabels = buildMatrix(dataTemp, nameDict, isSparse=0)
+def makeDataEval(data, nameDict):
+    evalData, evalLabels = buildMatrix(data, nameDict, isSparse=0)
 
     return evalData, evalLabels

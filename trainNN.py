@@ -1,19 +1,15 @@
 import modelFuncs
 import backend
-import configparser
 
 if __name__ == "__main__":
 
-    config = configparser.RawConfigParser()
-    config.read("config/config.cfg")
-    samples = int(config.get("Saltybet", "samples"))
-    testsamples = int(config.get("Saltybet", "testsamples"))
+    samples, testsamples = backend.readConfig()
 
     data = backend.loadData('data/data.db')
 
     batch_size = 512
 
-    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeDataTrain(data[:samples], backend.buildDict(data[:samples+testsamples]), samples)
+    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeDataTrain(data[:samples], backend.buildDict(data[:samples+testsamples]))
 
     model = modelFuncs.genModel(trainData[0].shape[1], trainData[1].shape[1], modelFuncs.optimizer("Adam", 0.0001))
 
