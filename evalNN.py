@@ -12,9 +12,15 @@ if __name__ == "__main__":
 
     evalData, evalLabels = backend.makeDataEval(data[samples:samples+testsamples], backend.buildDict(data[:samples+testsamples]))
 
+    model = modelFuncs.load_model('./models/model.hdf5')
+
     while True:
 
-        model = modelFuncs.load_model('./models/model.hdf5')
+        try:
+            model.load_weights('./models/model.hdf5')
+        except:
+            time.sleep(5)
+            continue
 
         scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
         print(scoreEval)
