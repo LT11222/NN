@@ -15,10 +15,10 @@ if __name__ == "__main__":
 
     optDict = backend.genOptDict()
 
-    samples = 10000
+    samples = 50000
     batch_size = 512
 
-    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data[:len(data)-samples], backend.buildDict(data), samples)
+    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data[:samples], backend.buildDict(data), samples)
 
     for name, value in optDict.items():
         for lr in value:

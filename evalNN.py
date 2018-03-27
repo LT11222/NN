@@ -7,10 +7,11 @@ if __name__ == "__main__":
 
     optDict = backend.genOptDict()
     
+    start = 10000
     samples = 10000
     batch_size = 128
 
-    testData, testLabels, testEvalData, testEvalLabels, evalData, evalLabels = backend.makeData(data[len(data)-samples:], backend.buildDict(data), samples)
+    testData, testLabels, testEvalData, testEvalLabels, evalData, evalLabels = backend.makeData(data[start:start+samples], backend.buildDict(data), samples)
 
     for name, value in optDict.items():
         for lr in value:
