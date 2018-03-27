@@ -8,22 +8,32 @@ from keras.callbacks import EarlyStopping, TensorBoard, ModelCheckpoint
 from keras import backend as K
 
 import backend
+import model
+
+import configparser
 
 if __name__ == "__main__":
+
+    config = configparser.RawConfigParser()
+    config.read("config/config.cfg")
+    samples = int(config.get("Saltybet", "samples"))
+    testsamples = int(config.get("Saltybet", "testsamples"))
+
+    print(samples)
+    print(testsamples)
 
     data = backend.loadData('data/data.db')
 
     optDict = backend.genOptDict()
 
-    samples = 50000
     batch_size = 512
 
-    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data[:samples], backend.buildDict(data), samples)
+    trainData, trainLabels, trainEvalData, trainEvalLabels, evalData, evalLabels = backend.makeData(data[:samples], backend.buildDict(data[:samples+testsamples]), samples)
 
     for name, value in optDict.items():
         for lr in value:
 
-            model = backend.genModel(trainData[0].shape[1], trainData[1].shape[1], backend.optimizer(name, lr))
+            model = model.genModel(trainData[0].shape[1], trainData[1].shape[1], model.optimizer(name, lr))
 
             filepath='./models/model.hdf5'
             checkpoint = ModelCheckpoint(filepath, monitor='val_acc', save_best_only=True, mode='max')

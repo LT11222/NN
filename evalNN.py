@@ -1,22 +1,28 @@
 import backend
+import model
 import time
 
+import configparser
+
 if __name__ == "__main__":
+
+    config = configparser.RawConfigParser()
+    config.read("config/config.cfg")
+    samples = int(config.get("Saltybet", "samples"))
+    testsamples = int(config.get("Saltybet", "testsamples"))
 
     data = backend.loadData('data/data.db')
 
     optDict = backend.genOptDict()
     
-    start = 10000
-    samples = 10000
     batch_size = 128
 
-    testData, testLabels, testEvalData, testEvalLabels, evalData, evalLabels = backend.makeData(data[start:start+samples], backend.buildDict(data), samples)
+    testData, testLabels, testEvalData, testEvalLabels, evalData, evalLabels = backend.makeData(data[samples:samples+testsamples], backend.buildDict(data[:samples+testsamples]), testsamples)
 
     for name, value in optDict.items():
         for lr in value:
 
-            model = backend.genModel(testData[0].shape[1], testData[1].shape[1], backend.optimizer(name, lr))
+            model = model.genModel(testData[0].shape[1], testData[1].shape[1], model.optimizer(name, lr))
 
             while True:
 
