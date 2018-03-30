@@ -46,9 +46,9 @@ def buildMatrix(data, nameDict, isSparse=1):
         redStats = rest[:int(len(rest)/2)]
         blueStats = rest[int(len(rest)/2):]
 
-        if(nameDict[name1] > nameDict[name2]):
+        if nameDict[name1] < nameDict[name2]:
             rest = redStats+blueStats
-        elif(nameDict[name2] > nameDict[name1]):
+        elif nameDict[name2] < nameDict[name1]:
             rest = blueStats+redStats
 
         dataMat[row] = rest
@@ -68,7 +68,7 @@ def predict(model, data, labels, cutoff = 0.5):
     count = 0
     total = 0
 
-    cutoff = 0.5
+    cutoff = 0.0
 
     for i in range(data.shape[0]):
         dataVals = numpy.where(data[i])[0]
@@ -83,11 +83,103 @@ def predict(model, data, labels, cutoff = 0.5):
         if res[i][dataVals[0]] - res[i][dataVals[1]] > cutoff or res[i][dataVals[1]] - res[i][dataVals[0]] > cutoff:
             total += 1
 
-        # total += 1
-
     print(total)
     print(data.shape[0])
     print(count/total)
+
+def predictOne(model, name1, name2, nameDict, dbPath='data/data.db'):
+
+    conn = sqlite3.connect(dbPath)
+    cursor = conn.cursor()
+    cursor.execute('PRAGMA synchronous = OFF')
+    cursor.execute('BEGIN TRANSACTION')
+
+    data = cursor.execute('''
+
+        SELECT 
+        redWins, redLosses, redUpsetBets, redUpsetMu, redWinrate, redAvgMatchTime, redAvgWinTime, redAvgLossTime, redMu, redSigma,
+		blueWins, blueLosses, blueUpsetBets, blueUpsetMu, blueWinrate, blueAvgMatchTime, blueAvgWinTime, blueAvgLossTime, blueMu, blueSigma 
+        FROM 
+        (SELECT 
+            (SELECT CAST(red.wins-min(allData.wins) AS FLOAT)/(max(allData.wins)-min(allData.wins))) AS redWins, 
+            (SELECT CAST(red.losses-min(allData.losses) AS FLOAT)/(max(allData.losses)-min(allData.losses))) AS redLosses, 
+            red.upsetBets AS redUpsetBets, 
+            red.upsetMu as redUpsetMu, 
+            CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS redWinrate, 
+            (SELECT CAST(red.mu-min(allData.mu) AS FLOAT)/(max(allData.mu)-min(allData.mu))) AS redMu, 
+            (SELECT CAST(red.sigma-min(allData.sigma) AS FLOAT)/(max(allData.sigma)-min(allData.sigma))) AS redSigma, 
+
+            (SELECT CAST(blue.wins-min(allData.wins) AS FLOAT)/(max(allData.wins)-min(allData.wins))) AS blueWins, 
+            (SELECT CAST(blue.losses-min(allData.losses) AS FLOAT)/(max(allData.losses)-min(allData.losses))) AS blueLosses, 
+            blue.upsetBets AS blueUpsetBets, 
+            blue.upsetMu AS blueUpsetMu, 
+            CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS blueWinrate, 
+            (SELECT CAST(blue.mu-min(allData.mu) AS FLOAT)/(max(allData.mu)-min(allData.mu))) AS blueMu, 
+            (SELECT CAST(blue.sigma-min(allData.sigma) AS FLOAT)/(max(allData.sigma)-min(allData.sigma))) AS blueSigma 
+            FROM 
+            characters AS red 
+            INNER JOIN
+            characters AS blue 
+            INNER JOIN
+            characters AS allData 
+            WHERE red.mode = "Matchmaking" AND red.name = ? AND blue.mode = "Matchmaking" AND blue.name = ?
+        )
+        
+        INNER JOIN
+        
+        (SELECT
+            (SELECT CAST((strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00'))-min(timeData.avgMatchTime) AS FLOAT)/(max(timeData.avgMatchTime)-min(timeData.avgMatchTime))) AS redAvgMatchTime, 
+            (SELECT CAST((strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00'))-min(timeData.avgMatchTime) AS FLOAT)/(max(timeData.avgMatchTime)-min(timeData.avgMatchTime))) AS blueAvgMatchTime, 
+			(SELECT CAST((strftime('%s', red.avgWinTime)-strftime('%s', '00:00:00'))-min(timeData.avgWinTime) AS FLOAT)/(max(timeData.avgWinTime)-min(timeData.avgWinTime))) AS redAvgWinTime, 
+            (SELECT CAST((strftime('%s', blue.avgWinTime)-strftime('%s', '00:00:00'))-min(timeData.avgWinTime) AS FLOAT)/(max(timeData.avgWinTime)-min(timeData.avgWinTime))) AS blueAvgWinTime, 
+			(SELECT CAST((strftime('%s', red.avgLossTime)-strftime('%s', '00:00:00'))-min(timeData.avgLossTime) AS FLOAT)/(max(timeData.avgLossTime)-min(timeData.avgLossTime))) AS redAvgLossTime, 
+            (SELECT CAST((strftime('%s', blue.avgLossTime)-strftime('%s', '00:00:00'))-min(timeData.avgLossTime) AS FLOAT)/(max(timeData.avgLossTime)-min(timeData.avgLossTime))) AS blueAvgLossTime 
+            FROM 
+            characters AS red 
+            INNER JOIN
+            characters AS blue 
+            INNER JOIN	
+            (SELECT strftime('%s', avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTime, 
+			strftime('%s', avgWinTime)-strftime('%s', '00:00:00') AS avgWinTime, 
+			strftime('%s', avgLossTime)-strftime('%s', '00:00:00') AS avgLossTime FROM characters
+			) AS timeData 
+            WHERE red.mode = "Matchmaking" AND red.name = ? AND blue.mode = "Matchmaking" AND blue.name = ?
+        )
+
+    ''', (name1, name2, name1, name2)).fetchone()
+
+    conn.close()
+
+    nameMat = numpy.zeros((1, len(nameDict)))
+    dataMat = numpy.zeros((1, len(data)))
+
+    nameMat[0,nameDict[name1]] = 1
+    nameMat[0,nameDict[name2]] = 1
+
+    redStats = data[:int(len(data)/2)]
+    blueStats = data[int(len(data)/2):]
+
+    if nameDict[name1] < nameDict[name2]:
+        data = redStats+blueStats
+    elif nameDict[name2] < nameDict[name1]:
+        data = blueStats+redStats
+
+    dataMat[0] = data
+
+    res = model.predict([nameMat, dataMat])[0]
+
+    cutoff = 0
+
+    print(res[nameDict[name1]])
+    print(res[nameDict[name2]])
+
+    if res[nameDict[name1]] - res[nameDict[name2]] > cutoff:
+        print(name1)
+
+    elif res[nameDict[name2]] - res[nameDict[name1]] > cutoff:
+        print(name2)
+
+    print("")
 
 def dataGenerator(data, labels, batch_size=1):
     while True:
@@ -108,28 +200,61 @@ def loadData(dbPath='data/data.db'):
     cursor.execute('PRAGMA synchronous = OFF')
     cursor.execute('BEGIN TRANSACTION')
 
+    cursor.execute('''
+
+	    DROP INDEX IF EXISTS temp
+
+	''')
+
+    conn.commit()
+
+    cursor.execute('''
+
+	    CREATE INDEX temp ON fights(mode)
+
+	''')
+
+    conn.commit()
+
     data = cursor.execute('''
 
         SELECT redName, blueName, winner, 
-            CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS winrate, strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00') AS avgTimeRed, red.mu, red.sigma, 
-            CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS winrate, strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00') AS avgTimeBlue, blue.mu, blue.sigma 
+            red.wins, red.losses, red.upsetBets, red.upsetMu, 
+            CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS redWinrate, 
+            strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTimeRed, 
+            strftime('%s', red.avgWinTime)-strftime('%s', '00:00:00') AS avgWinTimeRed, 
+            strftime('%s', red.avgLossTime)-strftime('%s', '00:00:00') AS avgLossTimeRed,
+            red.mu, red.sigma, 
+            blue.wins, blue.losses, blue.upsetBets, blue.upsetMu, 
+            CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS blueWinrate, 
+            strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTimeBlue, 
+            strftime('%s', blue.avgWinTime)-strftime('%s', '00:00:00') AS avgWinTimeBlue,
+            strftime('%s', blue.avgLossTime)-strftime('%s', '00:00:00') AS avgLossTimeBlue,
+            blue.mu, blue.sigma 
             from fights 
-            INNER JOIN characters AS red ON fights.redName = red.name and fights.mode = red.mode and (fights.mode = "Matchmaking" or fights.mode = "Tournament")
-            INNER JOIN characters AS blue ON fights.blueName = blue.name and fights.mode = blue.mode and (fights.mode = "Matchmaking" or fights.mode = "Tournament")
-            WHERE (fights.mode = "Matchmaking" or fights.mode = "Tournament") and red.wins+red.losses >= 10 and blue.wins+blue.losses >= 10 and redName != blueName;
+            INNER JOIN characters AS red ON fights.redName = red.name AND fights.mode = red.mode 
+            INNER JOIN characters AS blue ON fights.blueName = blue.name AND fights.mode = blue.mode 
+            WHERE (fights.mode = "Matchmaking" or fights.mode = "Tournament") AND red.wins+red.losses >= 10 AND blue.wins+blue.losses >= 10
+            AND red.avgWinTime IS NOT NULL AND red.avgLossTime IS NOT NULL AND blue.avgWinTime IS NOT NULL AND blue.avgLossTime is not NULL
 
     ''').fetchall()
+
+    cursor.execute('''
+
+	    DROP INDEX temp
+
+	''')
+
+    conn.commit()
 
     conn.close()
 
     df = pandas.DataFrame(data)
 
-    for value in [4,5,6,8,9,10]:
+    for value in [3,4,8,9,10,11,12,13,14,18,19,20,21,22]:
         df[value] = (df[value]-df[value].min()) / (df[value].max()-df[value].min())
 
     return df.values.tolist()
-
-    # return data
 
 def makeDataTrain(data, nameDict):
     trainData, trainLabels = buildMatrix(data[:int(0.9*len(data))], nameDict)
