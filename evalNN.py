@@ -1,34 +1,36 @@
 import modelFuncs
 import backend
-import time
+import itertools
+from keras import backend as K
 
-if __name__ == "__main__":
-
-    samples, testsamples = backend.readConfig()
-
-    data = backend.loadData('data/data.db')
+def eval(data, samples, epochs, optimizer, lr, l2):
 
     batch_size = 128
 
-    evalData, evalLabels = backend.makeDataEval(data[samples:samples+testsamples], backend.buildDict(data[:samples+testsamples]))
+    evalData, evalLabels = data
 
-    model = modelFuncs.load_model('./models/model.hdf5')
+    try:
+        model = modelFuncs.load_model('./models/{}_{}_{}_{}_{}.hdf5'.format(samples, epochs, optimizer, str(lr).replace('.', '_'), str(l2).replace('.','_')))
+    except:
+        return
 
-    while True:
+    print('{}_{}_{}_{}_{}.hdf5'.format(samples, epochs, optimizer, str(lr).replace('.', '_'), str(l2).replace('.','_')))
 
-        try:
-            model.load_weights('./models/model.hdf5')
-        except:
-            time.sleep(5)
-            continue
+    scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
+    print(scoreEval)
+    print('')
 
-        scoreEval = model.evaluate(evalData, evalLabels, batch_size=batch_size)
-        print(scoreEval)
+    backend.predict(model, evalData, evalLabels)
+    print('')
 
-        print('')
+    K.clear_session()
 
-        backend.predict(model, evalData, evalLabels)
+if __name__ == "__main__":
 
-        print('')
+    samples, testsamples, epochs, optimizer, lr, l2 = backend.readConfig()
+    data = backend.getData(samples, testsamples, "eval")
 
-        time.sleep(5)
+    parameters = itertools.product(epochs, optimizer, lr, l2)
+
+    for value in parameters:
+        eval(data, samples, *value)

@@ -8,13 +8,25 @@ import pandas
 
 import configparser
 
-def readConfig():
+def readConfig(path='./config/config.cfg'):
     config = configparser.RawConfigParser()
-    config.read("config/config.cfg")
+    config.read(path)
     samples = int(config.get("Saltybet", "samples"))
     testsamples = int(config.get("Saltybet", "testsamples"))
+    epochs = [int(x) for x in str.split(config.get("Saltybet", "epochs"), ',')]
+    optimizers = str.split(config.get("Saltybet", "optimizer"), ',')
+    lr = [float(x) for x in str.split(config.get("Saltybet", "lr"), ',')]
+    l2 = [float(x) for x in str.split(config.get("Saltybet", "l2"), ',')]
 
-    return samples, testsamples
+    return samples, testsamples, epochs, optimizers, lr, l2
+
+def getData(samples, testsamples, mode, path='./data/data.db'):
+    data = loadData(path)
+
+    if mode == "train":
+        return makeDataTrain(data[:samples], buildDict(data[:samples+testsamples]))
+    if mode == "eval":
+        return makeDataEval(data[samples:samples+testsamples], buildDict(data[:samples+testsamples]))
 
 def buildDict(data):
     data = [x[:2] for x in data]
@@ -219,18 +231,23 @@ def loadData(dbPath='data/data.db'):
     data = cursor.execute('''
 
         SELECT redName, blueName, winner, 
-            red.wins, red.losses, red.upsetBets, red.upsetMu, 
+
+            red.wins as redWins, red.losses as redLosses, red.upsetBets as redUpsetBets, 
+            red.upsetMu as redUpsetMu, red.expectedProfits as redExpectedProfits, 
             CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS redWinrate, 
             strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTimeRed, 
             strftime('%s', red.avgWinTime)-strftime('%s', '00:00:00') AS avgWinTimeRed, 
             strftime('%s', red.avgLossTime)-strftime('%s', '00:00:00') AS avgLossTimeRed,
-            red.mu, red.sigma, 
-            blue.wins, blue.losses, blue.upsetBets, blue.upsetMu, 
+            red.mu as redMu, red.sigma as redSigma, 
+
+            blue.wins as blueWins, blue.losses as blueLosses, blue.upsetBets as blueUpsetBets, 
+            blue.upsetMu as blueUpsetMu, blue.expectedProfits as blueExpectedProfits, 
             CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS blueWinrate, 
             strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTimeBlue, 
             strftime('%s', blue.avgWinTime)-strftime('%s', '00:00:00') AS avgWinTimeBlue,
             strftime('%s', blue.avgLossTime)-strftime('%s', '00:00:00') AS avgLossTimeBlue,
-            blue.mu, blue.sigma 
+            blue.mu as blueMu, blue.sigma as blueSigma
+
             from fights 
             INNER JOIN characters AS red ON fights.redName = red.name AND fights.mode = red.mode 
             INNER JOIN characters AS blue ON fights.blueName = blue.name AND fights.mode = blue.mode 
@@ -238,6 +255,8 @@ def loadData(dbPath='data/data.db'):
             AND red.avgWinTime IS NOT NULL AND red.avgLossTime IS NOT NULL AND blue.avgWinTime IS NOT NULL AND blue.avgLossTime is not NULL
 
     ''').fetchall()
+
+    headerList = [x[0] for x in cursor.description]
 
     cursor.execute('''
 
@@ -249,9 +268,12 @@ def loadData(dbPath='data/data.db'):
 
     conn.close()
 
-    df = pandas.DataFrame(data)
+    df = pandas.DataFrame(data, columns=headerList)
 
-    for value in [3,4,8,9,10,11,12,13,14,18,19,20,21,22]:
+    for value in [
+        "redWins", "redLosses", "redExpectedProfits", "avgMatchTimeRed", "avgWinTimeRed", "avgLossTimeRed", "redMu", "redSigma", 
+        "blueWins", "blueLosses", "blueExpectedProfits", "avgMatchTimeBlue", "avgWinTimeBlue", "avgLossTimeRed", "blueMu", "blueSigma" 
+        ]:
         df[value] = (df[value]-df[value].min()) / (df[value].max()-df[value].min())
 
     return df.values.tolist()
