@@ -13,10 +13,10 @@ def readConfig(path='./config/config.cfg'):
     config.read(path)
     samples = int(config.get("Saltybet", "samples"))
     testsamples = int(config.get("Saltybet", "testsamples"))
-    epochs = [int(x) for x in str.split(config.get("Saltybet", "epochs"), ',')]
-    optimizers = str.split(config.get("Saltybet", "optimizer"), ',')
-    lr = [float(x) for x in str.split(config.get("Saltybet", "lr"), ',')]
-    l2 = [float(x) for x in str.split(config.get("Saltybet", "l2"), ',')]
+    epochs = [int(x) for x in str.split(config.get("Saltybet", "epochs"), ', ')]
+    optimizers = str.split(config.get("Saltybet", "optimizer"), ', ')
+    lr = [float(x) for x in str.split(config.get("Saltybet", "lr"), ', ')]
+    l2 = [float(x) for x in str.split(config.get("Saltybet", "l2"), ', ')]
 
     return samples, testsamples, epochs, optimizers, lr, l2
 
@@ -80,7 +80,7 @@ def predict(model, data, labels, cutoff = 0.5):
     count = 0
     total = 0
 
-    cutoff = 0.0
+    cutoff = 0.75
 
     for i in range(data.shape[0]):
         dataVals = numpy.where(data[i])[0]
@@ -233,26 +233,29 @@ def loadData(dbPath='data/data.db'):
         SELECT redName, blueName, winner, 
 
             red.wins as redWins, red.losses as redLosses, red.upsetBets as redUpsetBets, 
-            red.upsetMu as redUpsetMu, red.expectedProfits as redExpectedProfits, 
+            red.upsetMu as redUpsetMu, red.expectedProfits as redExpectedProfits, red.expectedProfitsAvg as redExpectedProfitsAvg, 
             CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS redWinrate, 
-            strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTimeRed, 
-            strftime('%s', red.avgWinTime)-strftime('%s', '00:00:00') AS avgWinTimeRed, 
-            strftime('%s', red.avgLossTime)-strftime('%s', '00:00:00') AS avgLossTimeRed,
+            strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00') AS redAvgMatchTime, 
+            strftime('%s', red.avgWinTime)-strftime('%s', '00:00:00') AS redAvgWinTime, 
+            strftime('%s', red.avgLossTime)-strftime('%s', '00:00:00') AS redAvgLossTime, 
+            red.avgOdds as redAvgOdds, red.avgWinOdds as redAvgWinOdds, red.avgLossOdds as redAvgLossOdds, 
             red.mu as redMu, red.sigma as redSigma, 
 
             blue.wins as blueWins, blue.losses as blueLosses, blue.upsetBets as blueUpsetBets, 
-            blue.upsetMu as blueUpsetMu, blue.expectedProfits as blueExpectedProfits, 
+            blue.upsetMu as blueUpsetMu, blue.expectedProfits as blueExpectedProfits, blue.expectedProfitsAvg as blueExpectedProfitsAvg, 
             CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS blueWinrate, 
-            strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00') AS avgMatchTimeBlue, 
-            strftime('%s', blue.avgWinTime)-strftime('%s', '00:00:00') AS avgWinTimeBlue,
-            strftime('%s', blue.avgLossTime)-strftime('%s', '00:00:00') AS avgLossTimeBlue,
+            strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00') AS blueAvgMatchTime, 
+            strftime('%s', blue.avgWinTime)-strftime('%s', '00:00:00') AS blueAvgWinTime, 
+            strftime('%s', blue.avgLossTime)-strftime('%s', '00:00:00') AS blueAvgLossTime, 
+            blue.avgOdds as blueAvgOdds, blue.avgWinOdds as blueAvgWinOdds, blue.avgLossOdds as blueAvgLossOdds, 
             blue.mu as blueMu, blue.sigma as blueSigma
 
             from fights 
             INNER JOIN characters AS red ON fights.redName = red.name AND fights.mode = red.mode 
             INNER JOIN characters AS blue ON fights.blueName = blue.name AND fights.mode = blue.mode 
             WHERE (fights.mode = "Matchmaking" or fights.mode = "Tournament") AND red.wins+red.losses >= 10 AND blue.wins+blue.losses >= 10
-            AND red.avgWinTime IS NOT NULL AND red.avgLossTime IS NOT NULL AND blue.avgWinTime IS NOT NULL AND blue.avgLossTime is not NULL
+            AND red.avgWinTime IS NOT NULL AND red.avgLossTime IS NOT NULL AND blue.avgWinTime IS NOT NULL AND blue.avgLossTime IS NOT NULL 
+            AND red.avgWinOdds IS NOT NULL AND red.avgLossOdds IS NOT NULL AND blue.avgWinOdds IS NOT NULL AND blue.avgLossOdds IS NOT NULL
 
     ''').fetchall()
 
@@ -271,10 +274,25 @@ def loadData(dbPath='data/data.db'):
     df = pandas.DataFrame(data, columns=headerList)
 
     for value in [
-        "redWins", "redLosses", "redExpectedProfits", "avgMatchTimeRed", "avgWinTimeRed", "avgLossTimeRed", "redMu", "redSigma", 
-        "blueWins", "blueLosses", "blueExpectedProfits", "avgMatchTimeBlue", "avgWinTimeBlue", "avgLossTimeRed", "blueMu", "blueSigma" 
+        "redAvgMatchTime", "redAvgWinTime", "redAvgLossTime", 
+        "blueAvgMatchTime", "blueAvgWinTime", "blueAvgLossTime"
         ]:
         df[value] = (df[value]-df[value].min()) / (df[value].max()-df[value].min())
+
+    for value in [
+        "redWins", "redLosses", "redExpectedProfits", "redExpectedProfitsAvg", "redAvgOdds", "redAvgWinOdds", "redAvgLossOdds","redMu", "redSigma", 
+        "blueWins", "blueLosses", "blueExpectedProfits", "blueExpectedProfitsAvg", "blueAvgOdds","blueAvgWinOdds", "blueAvgLossOdds", "blueMu", "blueSigma" 
+        ]:
+        df[value] = (df[value]-df[value].mean()) / df[value].std()
+
+    # df = df.drop(["redWins","redLosses", "blueWins", "blueLosses", 
+    #     "redMu", "blueMu", "redSigma", "blueSigma", 
+    #     "redExpectedProfits", "redExpectedProfitsAvg", "blueExpectedProfits", "blueExpectedProfitsAvg"], axis=1)
+
+    df = df.drop(["redWins","redLosses", "blueWins", "blueLosses", 
+        "redMu", "blueMu", "redSigma", "blueSigma"], axis=1)
+
+    print(df.columns.values.tolist())
 
     return df.values.tolist()
 
