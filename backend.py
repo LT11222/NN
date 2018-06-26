@@ -43,12 +43,13 @@ def buildMatrix(data, nameDict, isSparse=1):
 
     if isSparse == 1:
         nameMat = sparse.lil_matrix((len(data),len(nameDict)))
-        labelMat = sparse.lil_matrix((len(data),len(nameDict)))
+        nameLabelMat = sparse.lil_matrix((len(data),len(nameDict)))
     else:
         nameMat = numpy.zeros((len(data),len(nameDict)))
-        labelMat = numpy.zeros((len(data),len(nameDict)))
+        nameLabelMat = numpy.zeros((len(data),len(nameDict)))
 
     dataMat = numpy.zeros((len(data),len(data[0])-3))
+    dataLabelMat = numpy.zeros((len(data), 2))
 
     for row, value in enumerate(data):
         name1, name2, winner, *rest = value
@@ -58,41 +59,67 @@ def buildMatrix(data, nameDict, isSparse=1):
         redStats = rest[:int(len(rest)/2)]
         blueStats = rest[int(len(rest)/2):]
 
-        if nameDict[name1] < nameDict[name2]:
-            rest = redStats+blueStats
-        elif nameDict[name2] < nameDict[name1]:
-            rest = blueStats+redStats
+        # if nameDict[name1] < nameDict[name2]:
+        #     rest = redStats+blueStats
+        # elif nameDict[name2] < nameDict[name1]:
+        #     rest = blueStats+redStats
 
         dataMat[row] = rest
+
         if winner == name1:
-            labelMat[row,nameDict[name1]] = 1
+            nameLabelMat[row,nameDict[name1]] = 1
+            dataLabelMat[row,0] = 1
         elif winner == name2:
-            labelMat[row,nameDict[name2]] = 1
+            nameLabelMat[row,nameDict[name2]] = 1
+            dataLabelMat[row,1] = 1
     
-    return [[nameMat, dataMat], [labelMat]]
+    return [[nameMat, dataMat], [nameLabelMat, dataLabelMat]]
 
-def predict(model, data, labels, cutoff = 0.5):
-    res = model.predict(data)
+def predict(model, dataIn, labelsIn, cutoff = 0.5):
+    res = model.predict(dataIn)
 
-    data = data[0]
-    labels = labels[0]
+    data = dataIn[0]
+    labels = labelsIn[0]
+
+    # cutoff = 0.75
 
     count = 0
     total = 0
-
-    cutoff = 0.75
 
     for i in range(data.shape[0]):
         dataVals = numpy.where(data[i])[0]
         labelVals = numpy.where(labels[i])[0]
 
-        if res[i][dataVals[0]] - res[i][dataVals[1]] > cutoff and labels[i][dataVals[0]] == 1:
+        if res[0][i][dataVals[0]] - res[0][i][dataVals[1]] > cutoff and labels[i][dataVals[0]] == 1:
             count += 1
 
-        elif res[i][dataVals[1]] - res[i][dataVals[0]] > cutoff and labels[i][dataVals[1]] == 1:
+        elif res[0][i][dataVals[1]] - res[0][i][dataVals[0]] > cutoff and labels[i][dataVals[1]] == 1:
             count += 1
 
-        if res[i][dataVals[0]] - res[i][dataVals[1]] > cutoff or res[i][dataVals[1]] - res[i][dataVals[0]] > cutoff:
+        if res[0][i][dataVals[0]] - res[0][i][dataVals[1]] > cutoff or res[0][i][dataVals[1]] - res[0][i][dataVals[0]] > cutoff:
+            total += 1
+
+    print(total)
+    print(data.shape[0])
+    print(count/total)
+
+    data = dataIn[1]
+    labels = labelsIn[1]
+
+    count = 0
+    total = 0
+
+    for i in range(data.shape[0]):
+        dataVals = numpy.where(data[i])[0]
+        labelVals = numpy.where(labels[i])[0]
+
+        if res[1][i][0] - res[1][i][1] > cutoff and labels[i][0] == 1:
+            count += 1
+
+        elif res[1][i][0] - res[1][i][1] > cutoff and labels[i][1] == 1:
+            count += 1
+
+        if res[1][i][0] - res[1][i][1] > cutoff or res[1][i][1] - res[1][i][0] > cutoff:
             total += 1
 
     print(total)
@@ -193,17 +220,29 @@ def predictOne(model, name1, name2, nameDict, dbPath='data/data.db'):
 
     print("")
 
-def dataGenerator(data, labels, batch_size=1):
+def dataGeneratorNames(data, labels, batch_size=1):
     while True:
 
-        index = list(range(data[0].shape[0]))
+        index = list(range(data.shape[0]))
         random.shuffle(index)
-        data = [data[0][index], data[1][index]]
-        labels = [labels[0][index]]
+        data = data[index]
+        labels = labels[index]
 
-        for i in range(data[0].shape[0]):
+        for i in range(data.shape[0]):
             if i != 0 and i % batch_size == 0:
-                yield [[data[0][i-batch_size:i].todense(), data[1][i-batch_size:i]], [labels[0][i-batch_size:i].todense()]]
+                yield [[data[i-batch_size:i].todense()], [labels[i-batch_size:i].todense()]]
+
+def dataGeneratorData(data, labels, batch_size=1):
+    while True:
+
+        index = list(range(data.shape[0]))
+        random.shuffle(index)
+        data = data[index]
+        labels = labels[index]
+
+        for i in range(data.shape[0]):
+            if i != 0 and i % batch_size == 0:
+                yield [[data[i-batch_size:i]], [labels[i-batch_size:i]]]
 
 def loadData(dbPath='data/data.db'):
 
@@ -289,8 +328,7 @@ def loadData(dbPath='data/data.db'):
     #     "redMu", "blueMu", "redSigma", "blueSigma", 
     #     "redExpectedProfits", "redExpectedProfitsAvg", "blueExpectedProfits", "blueExpectedProfitsAvg"], axis=1)
 
-    df = df.drop(["redWins","redLosses", "blueWins", "blueLosses", 
-        "redMu", "blueMu", "redSigma", "blueSigma"], axis=1)
+    # df = df.drop(["redMu", "blueMu", "redSigma", "blueSigma"], axis=1)
 
     print(df.columns.values.tolist())
 
