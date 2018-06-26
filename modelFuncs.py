@@ -31,7 +31,7 @@ def optimizer(name, val):
     if name == "Nadam":
         return Nadam(lr=val)
 
-def genModel(nameCount, dataCount, optimizer, l2Val):
+def genModelNames(nameCount, optimizer, l2Val):
 
     units = int(nameCount/8)
 
@@ -41,12 +41,29 @@ def genModel(nameCount, dataCount, optimizer, l2Val):
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(units, kernel_regularizer=l2(l=l2Val))(x)
-    # x = Activation('relu')(x)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
+    x = Dense(units, kernel_regularizer=l2(l=l2Val))(x)
+    x = Activation('relu')(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
 
-    nameOutput = Dense(units, name='nameOutput')(x)
+    x = Dense(nameCount)(x)
+    x = BatchNormalization()(x)
+
+    nameOutput = Activation('softmax', name='nameOutput')(x)
+
+    model = Model(inputs=[nameInput], outputs=[nameOutput])
+
+    model.compile(loss='categorical_crossentropy',
+        optimizer = optimizer,
+        metrics=['accuracy'])
+
+    plot_model(model, to_file='modelNames.png')
+
+    model.summary()
+
+    return model
+
+def genModelData(dataCount, optimizer, l2Val):
 
     dataInput = Input(shape=(dataCount,), name='dataInput')
     x = Dense(dataCount, kernel_regularizer=l2(l=l2Val))(dataInput)
@@ -54,57 +71,28 @@ def genModel(nameCount, dataCount, optimizer, l2Val):
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(dataCount, kernel_regularizer=l2(l=l2Val))(x)
+    # x = Dense(int(dataCount*2), kernel_regularizer=l2(l=l2Val))(x)
     # x = Activation('relu')(x)
     # x = BatchNormalization()(x)
     # x = Dropout(0.5)(x)
 
-    dataOutput = Dense(dataCount, name='dataOutput')(x)
-
-    x = concatenate([nameOutput, dataOutput])
-
-    x = Dense(units+dataCount, kernel_regularizer=l2(l=l2Val))(x)
+    x = Dense(dataCount, kernel_regularizer=l2(l=l2Val))(x)
     x = Activation('relu')(x)
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
 
-    x = Dense(2*(units+dataCount), kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(4*(units+dataCount), kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(2*(units+dataCount), kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(units+dataCount, kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    # x = Dense(units+dataCount, kernel_regularizer=l2(l=l2Val))(x)
-    # x = Activation('relu')(x)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
-
-    x = Dense(nameCount)(x)
+    x = Dense(2)(x)
     x = BatchNormalization()(x)
 
-    mainOutput = Activation('softmax', name='mainOutput')(x)
+    dataOutput = Activation('softmax', name='dataOutput')(x)
 
-    model = Model(inputs=[nameInput, dataInput], outputs=[mainOutput])
+    model = Model(inputs=[dataInput], outputs=[dataOutput])
 
     model.compile(loss='categorical_crossentropy',
         optimizer = optimizer,
         metrics=['accuracy'])
 
-    plot_model(model, to_file='model.png')
+    plot_model(model, to_file='modelData.png')
 
     model.summary()
 
