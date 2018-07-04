@@ -232,27 +232,29 @@ def loadData(dbPath='data/data.db'):
 
         SELECT redName, blueName, winner, 
 
-            red.wins as redWins, red.losses as redLosses, red.upsetBets as redUpsetBets, 
-            red.upsetMu as redUpsetMu, red.expectedProfits as redExpectedProfits, red.expectedProfitsAvg as redExpectedProfitsAvg, 
+            redAuthor.winrate AS redAuthorWinrate, red.wins AS redWins, red.losses AS redLosses, red.hist AS redHist, red.upsetBets AS redUpsetBets, 
+            red.upsetMu AS redUpsetMu, red.expectedProfits AS redExpectedProfits, red.expectedProfitsAvg AS redExpectedProfitsAvg, 
             CAST(red.wins AS FLOAT)/(red.wins+red.losses) AS redWinrate, 
             strftime('%s', red.avgMatchTime)-strftime('%s', '00:00:00') AS redAvgMatchTime, 
             strftime('%s', red.avgWinTime)-strftime('%s', '00:00:00') AS redAvgWinTime, 
             strftime('%s', red.avgLossTime)-strftime('%s', '00:00:00') AS redAvgLossTime, 
-            red.avgOdds as redAvgOdds, red.avgWinOdds as redAvgWinOdds, red.avgLossOdds as redAvgLossOdds, 
-            red.mu as redMu, red.sigma as redSigma, 
+            red.avgOdds AS redAvgOdds, red.avgWinOdds AS redAvgWinOdds, red.avgLossOdds AS redAvgLossOdds, 
+            red.mu AS redMu, red.sigma AS redSigma, 
 
-            blue.wins as blueWins, blue.losses as blueLosses, blue.upsetBets as blueUpsetBets, 
-            blue.upsetMu as blueUpsetMu, blue.expectedProfits as blueExpectedProfits, blue.expectedProfitsAvg as blueExpectedProfitsAvg, 
+            blueAuthor.winrate AS blueAuthorWinrate, blue.wins AS blueWins, blue.losses AS blueLosses, blue.hist AS blueHist, blue.upsetBets AS blueUpsetBets, 
+            blue.upsetMu AS blueUpsetMu, blue.expectedProfits AS blueExpectedProfits, blue.expectedProfitsAvg AS blueExpectedProfitsAvg, 
             CAST(blue.wins AS FLOAT)/(blue.wins+blue.losses) AS blueWinrate, 
             strftime('%s', blue.avgMatchTime)-strftime('%s', '00:00:00') AS blueAvgMatchTime, 
             strftime('%s', blue.avgWinTime)-strftime('%s', '00:00:00') AS blueAvgWinTime, 
             strftime('%s', blue.avgLossTime)-strftime('%s', '00:00:00') AS blueAvgLossTime, 
-            blue.avgOdds as blueAvgOdds, blue.avgWinOdds as blueAvgWinOdds, blue.avgLossOdds as blueAvgLossOdds, 
-            blue.mu as blueMu, blue.sigma as blueSigma
+            blue.avgOdds AS blueAvgOdds, blue.avgWinOdds AS blueAvgWinOdds, blue.avgLossOdds AS blueAvgLossOdds, 
+            blue.mu AS blueMu, blue.sigma AS blueSigma
 
             from fights 
             INNER JOIN characters AS red ON fights.redName = red.name AND fights.mode = red.mode 
             INNER JOIN characters AS blue ON fights.blueName = blue.name AND fights.mode = blue.mode 
+			LEFT JOIN author AS redAuthor ON fights.redAuthor = redAuthor.name
+			LEFT JOIN author AS blueAuthor ON fights.blueAuthor = blueAuthor.name
             WHERE (fights.mode = "Matchmaking" or fights.mode = "Tournament") AND red.wins+red.losses >= 10 AND blue.wins+blue.losses >= 10
             AND red.avgWinTime IS NOT NULL AND red.avgLossTime IS NOT NULL AND blue.avgWinTime IS NOT NULL AND blue.avgLossTime IS NOT NULL 
             AND red.avgWinOdds IS NOT NULL AND red.avgLossOdds IS NOT NULL AND blue.avgWinOdds IS NOT NULL AND blue.avgLossOdds IS NOT NULL
@@ -272,6 +274,8 @@ def loadData(dbPath='data/data.db'):
     conn.close()
 
     df = pandas.DataFrame(data, columns=headerList)
+
+    df = df.dropna()
 
     for value in [
         "redAvgMatchTime", "redAvgWinTime", "redAvgLossTime", 
