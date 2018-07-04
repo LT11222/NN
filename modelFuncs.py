@@ -41,10 +41,10 @@ def genModel(nameCount, dataCount, optimizer, l2Val):
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(units, kernel_regularizer=l2(l=l2Val))(x)
-    # x = Activation('relu')(x)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
+    x = Dense(units, kernel_regularizer=l2(l=l2Val))(x)
+    x = Activation('relu')(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
 
     nameOutput = Dense(units, name='nameOutput')(x)
 
@@ -54,31 +54,16 @@ def genModel(nameCount, dataCount, optimizer, l2Val):
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
 
-    # x = Dense(dataCount, kernel_regularizer=l2(l=l2Val))(x)
-    # x = Activation('relu')(x)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
+    x = Dense(dataCount, kernel_regularizer=l2(l=l2Val))(x)
+    x = Activation('relu')(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
 
     dataOutput = Dense(dataCount, name='dataOutput')(x)
 
     x = concatenate([nameOutput, dataOutput])
 
     x = Dense(units+dataCount, kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(2*(units+dataCount), kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(4*(units+dataCount), kernel_regularizer=l2(l=l2Val))(x)
-    x = Activation('relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(2*(units+dataCount), kernel_regularizer=l2(l=l2Val))(x)
     x = Activation('relu')(x)
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
